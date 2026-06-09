@@ -1,41 +1,125 @@
 "use client";
 
-import { useState, useRef, useLayoutEffect } from "react";
-import { motion, useScroll, useTransform, useSpring } from "framer-motion";
+import { useState, useRef, useLayoutEffect, useEffect } from "react";
+import {
+  motion,
+  useScroll,
+  useTransform,
+  useSpring,
+  useMotionValue,
+  useAnimationFrame,
+} from "framer-motion";
 import { portfolioItems, ARTIST } from "@/lib/data";
 
 const filters = ["Todos", "Realismo", "Religioso", "Fineline"];
 
+const SLAB_DEPTH = 26; // espessura do "monólito" em px
+const MAX_TILT = 24; // ângulo máximo de rotação ao passar pela tela
+
 type PortfolioItem = (typeof portfolioItems)[0];
 
+/**
+ * Cada tatuagem é um "monólito": uma placa 3D com espessura que gira em torno
+ * do eixo vertical conforme atravessa a viewport. O ângulo é derivado da posição
+ * do card na tela a cada frame, então funciona tanto no scroll horizontal fixo
+ * (desktop) quanto no swipe nativo (mobile).
+ */
 function Card({ item, index }: { item: PortfolioItem; index: number }) {
+  const slotRef = useRef<HTMLDivElement>(null);
+  const rotY = useMotionValue(0);
+  const smoothRot = useSpring(rotY, { stiffness: 110, damping: 22, mass: 0.4 });
+  const reduced = useRef(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.matchMedia) {
+      reduced.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    }
+  }, []);
+
+  useAnimationFrame(() => {
+    const el = slotRef.current;
+    if (!el || reduced.current) return;
+    const r = el.getBoundingClientRect();
+    const vw = window.innerWidth || 1;
+    // -1 quando o card está totalmente à esquerda, 0 no centro, +1 à direita
+    const t = (r.left + r.width / 2 - vw / 2) / (vw / 2);
+    const clamped = Math.max(-1, Math.min(1, t));
+    rotY.set(clamped * -MAX_TILT);
+  });
+
   return (
+    // slot: mantém o tamanho do card e fornece a perspectiva
     <div
+      ref={slotRef}
       data-cursor="hover"
-      className="group relative h-full w-[78vw] flex-shrink-0 overflow-hidden sm:w-[56vw] lg:w-[34vw] xl:w-[30vw]"
+      className="group relative h-full w-[78vw] flex-shrink-0 sm:w-[56vw] lg:w-[34vw] xl:w-[30vw]"
+      style={{ perspective: "1400px" }}
     >
-      <img
-        src={item.src}
-        alt={item.alt}
-        loading={index < 3 ? "eager" : "lazy"}
-        className="absolute inset-0 h-full w-full object-cover grayscale transition-all duration-[900ms] ease-out group-hover:scale-[1.05] group-hover:grayscale-0"
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-paper-950/85 via-paper-950/15 to-transparent" />
+      {/* corpo 3D que gira */}
+      <motion.div
+        className="relative h-full w-full"
+        style={{
+          rotateY: smoothRot,
+          transformStyle: "preserve-3d",
+        }}
+      >
+        {/* face frontal: a tatuagem */}
+        <div
+          className="absolute inset-0 overflow-hidden"
+          style={{ transform: `translateZ(${SLAB_DEPTH / 2}px)`, backfaceVisibility: "hidden" }}
+        >
+          <img
+            src={item.src}
+            alt={item.alt}
+            loading={index < 3 ? "eager" : "lazy"}
+            className="absolute inset-0 h-full w-full object-cover grayscale transition-all duration-[900ms] ease-out group-hover:scale-[1.05] group-hover:grayscale-0"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-paper-950/85 via-paper-950/15 to-transparent" />
 
-      <div className="absolute right-5 top-5 opacity-0 transition-opacity duration-500 group-hover:opacity-100">
-        <p className="bg-paper-950/60 px-2 py-1 text-[8px] uppercase tracking-widest text-paper-300 backdrop-blur-sm">
-          {item.style}
-        </p>
-      </div>
+          <div className="absolute right-5 top-5 opacity-0 transition-opacity duration-500 group-hover:opacity-100">
+            <p className="bg-paper-950/60 px-2 py-1 text-[8px] uppercase tracking-widest text-paper-300 backdrop-blur-sm">
+              {item.style}
+            </p>
+          </div>
 
-      <div className="absolute bottom-0 left-0 right-0 p-6">
-        <p className="mb-1 text-[8px] uppercase tracking-[0.4em] text-paper-500">
-          {item.style} · {item.placement}
-        </p>
-        <p className="font-serif text-lg font-semibold tracking-wider text-paper-100">
-          {item.label}
-        </p>
-      </div>
+          <div className="absolute bottom-0 left-0 right-0 p-6">
+            <p className="mb-1 text-[8px] uppercase tracking-[0.4em] text-paper-500">
+              {item.style} · {item.placement}
+            </p>
+            <p className="font-serif text-lg font-semibold tracking-wider text-paper-100">
+              {item.label}
+            </p>
+          </div>
+        </div>
+
+        {/* face traseira: cópia escurecida da tatuagem */}
+        <div
+          className="absolute inset-0 overflow-hidden"
+          style={{ transform: `translateZ(-${SLAB_DEPTH / 2}px) rotateY(180deg)`, backfaceVisibility: "hidden" }}
+        >
+          <img src={item.src} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover grayscale" />
+          <div className="absolute inset-0 bg-paper-950/80" />
+        </div>
+
+        {/* espessura: aresta direita */}
+        <div
+          className="absolute inset-y-0 right-0 bg-gradient-to-l from-paper-950 to-paper-900"
+          style={{
+            width: `${SLAB_DEPTH}px`,
+            transform: `rotateY(90deg) translateZ(${SLAB_DEPTH / 2}px)`,
+            transformOrigin: "right center",
+          }}
+        />
+        {/* espessura: aresta esquerda */}
+        <div
+          className="absolute inset-y-0 left-0 bg-gradient-to-r from-paper-950 to-paper-900"
+          style={{
+            width: `${SLAB_DEPTH}px`,
+            transform: `rotateY(-90deg) translateZ(${SLAB_DEPTH / 2}px)`,
+            transformOrigin: "left center",
+          }}
+        />
+      </motion.div>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { ARTIST } from "@/lib/data";
 import ScrambleText from "@/components/ui/ScrambleText";
+import Hero3D from "@/components/hero/Hero3D";
 
 const HERO_BG = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/portfolio/hero.jpg`;
 
@@ -23,14 +24,22 @@ export default function Hero() {
       {/* Background image */}
       <motion.div style={{ y: imgY }} className="absolute inset-0 z-0">
         <div
-          className="absolute inset-0 bg-cover bg-center scale-110"
+          className="absolute inset-0 bg-cover bg-center scale-110 blur-md"
           style={{
             backgroundImage: `url('${HERO_BG}')`,
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-paper-950/95 via-paper-950/55 to-paper-950/30" />
-        <div className="absolute inset-0 bg-gradient-to-r from-paper-950/70 via-transparent to-transparent" />
+        {/* escurece o fundo estático: ele vira um ambiente; a foto girando é o foco */}
+        <div className="absolute inset-0 bg-paper-950/75" />
+        <div className="absolute inset-0 bg-gradient-to-t from-paper-950 via-paper-950/70 to-paper-950/45" />
+        <div className="absolute inset-0 bg-gradient-to-r from-paper-950/85 via-paper-950/30 to-transparent" />
       </motion.div>
+
+      {/* Cena 3D — caneta de tatuar girando (estética monolith) */}
+      <Hero3D className="absolute inset-y-0 right-0 z-[1] w-full lg:w-[58%] opacity-50 sm:opacity-70 lg:opacity-100" />
+
+      {/* Reforço de legibilidade do texto sobre o 3D (some no desktop) */}
+      <div className="absolute inset-0 z-[2] bg-gradient-to-t from-paper-950/80 via-paper-950/20 to-transparent lg:hidden pointer-events-none" />
 
       {/* Decorative Latin — large ghost text */}
       <div

@@ -117,7 +117,7 @@ export default function FlashGallery() {
                 </div>
                 <div className="mt-auto pt-4 border-t border-paper-200">
                   <a
-                    href={`#orcamento?flash=${encodeURIComponent(flash.name)}`}
+                    href={`#orcamento?ref=${encodeURIComponent(flash.name)}&img=${encodeURIComponent(flash.src)}`}
                     className="inline-flex items-center gap-2 text-[9px] tracking-widest uppercase text-ink hover:text-gold-light transition-colors duration-300"
                   >
                     Quero este flash <ArrowRight size={10} />

@@ -9,6 +9,7 @@ import {
   useMotionValue,
   useAnimationFrame,
 } from "framer-motion";
+import { ArrowRight } from "lucide-react";
 import { portfolioItems, ARTIST } from "@/lib/data";
 
 const filters = ["Todos", "Realismo", "Religioso", "Fineline"];
@@ -89,6 +90,13 @@ function Card({ item, index }: { item: PortfolioItem; index: number }) {
             <p className="font-serif text-lg font-semibold tracking-wider text-paper-100">
               {item.label}
             </p>
+            <a
+              href={`#orcamento?ref=${encodeURIComponent(item.label)}&img=${encodeURIComponent(item.src)}`}
+              data-cursor="hover"
+              className="mt-3 inline-flex items-center gap-2 border border-paper-100/40 px-3 py-1.5 text-[9px] uppercase tracking-widest text-paper-100 backdrop-blur-sm transition-colors duration-300 hover:bg-paper-100 hover:text-ink"
+            >
+              Quero esta <ArrowRight size={10} />
+            </a>
           </div>
         </div>
 

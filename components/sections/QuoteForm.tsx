@@ -9,7 +9,8 @@ import { trackWhatsAppClick } from "@/lib/analytics";
 
 interface FormData {
   name: string; whatsapp: string; description: string;
-  placement: string; size: string; references: File[]; selectedFlash: string;
+  placement: string; size: string; references: File[];
+  refLabel: string; refImg: string;
 }
 
 function Field({ label, name, type = "text", value, onChange, placeholder }: {
@@ -52,15 +53,21 @@ function Textarea({ label, name, value, onChange }: {
   );
 }
 
-function buildMessage(f: FormData) {
+function buildMessage(f: FormData, imgUrl: string) {
   return [
     `Olá ${ARTIST.name}! Vim pelo site e quero um orçamento. 🖤`,
     ``, `*Nome:* ${f.name}`,
     f.whatsapp ? `*WhatsApp:* ${f.whatsapp}` : "",
-    f.selectedFlash ? `*Flash:* ${f.selectedFlash}` : "",
+    f.refLabel ? `*Tatuagem escolhida:* ${f.refLabel}` : "",
+    // A imagem escolhida vai como link — o WhatsApp gera a prévia com a foto.
+    imgUrl ? imgUrl : "",
     f.placement ? `*Local:* ${f.placement}` : "",
     f.size ? `*Tamanho:* ${f.size}` : "",
     ``, `*Ideia:*`, f.description || "(sem descrição)",
+    f.references.length ? `` : "",
+    f.references.length
+      ? `_(Vou enviar ${f.references.length} imagem(ns) de referência aqui no chat.)_`
+      : "",
   ].filter(Boolean).join("\n");
 }
 
@@ -68,29 +75,33 @@ const placements = ["Antebraço", "Braço", "Ombro", "Costela", "Perna", "Tornoz
 const sizes = ["Pequeno (até 5cm)", "Médio (5–10cm)", "Grande (10–20cm)", "Full piece (+20cm)"];
 
 export default function QuoteForm() {
-  const [form, setForm] = useState<FormData>({ name: "", whatsapp: "", description: "", placement: "", size: "", references: [], selectedFlash: "" });
+  const [form, setForm] = useState<FormData>({ name: "", whatsapp: "", description: "", placement: "", size: "", references: [], refLabel: "", refImg: "" });
   const [submitted, setSubmitted] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const applyFlash = () => {
+    // Aplica a tatuagem/flash escolhida via hash: #orcamento?ref=NOME&img=CAMINHO
+    // (mantém compatibilidade com o ?flash=NOME do simulador).
+    const applyRef = () => {
       const params = new URLSearchParams(window.location.hash.split("?")[1] || "");
-      const flash = params.get("flash");
-      if (!flash) return;
+      const ref = params.get("ref") || params.get("flash");
+      const img = params.get("img") || "";
+      if (!ref) return;
       setForm(p => ({
         ...p,
-        selectedFlash: flash,
+        refLabel: ref,
+        refImg: img || p.refImg,
         description: p.description.trim() === "" || p.description.startsWith("Quero a tatuagem")
-          ? `Quero a tatuagem "${flash}" que vi no simulador. `
+          ? `Quero a tatuagem "${ref}" que vi no site. `
           : p.description,
       }));
       requestAnimationFrame(() => {
         document.getElementById("orcamento")?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     };
-    applyFlash();
-    window.addEventListener("hashchange", applyFlash);
-    return () => window.removeEventListener("hashchange", applyFlash);
+    applyRef();
+    window.addEventListener("hashchange", applyRef);
+    return () => window.removeEventListener("hashchange", applyRef);
   }, []);
 
   const set = (f: keyof FormData) => (v: string) => setForm(p => ({ ...p, [f]: v }));
@@ -99,10 +110,17 @@ export default function QuoteForm() {
     e.preventDefault();
     trackWhatsAppClick({
       source: "quote_form",
-      flash_name: form.selectedFlash || undefined,
+      flash_name: form.refLabel || undefined,
       placement: form.placement || undefined,
     });
-    window.open(`https://wa.me/${ARTIST.whatsapp}?text=${encodeURIComponent(buildMessage(form))}`, "_blank", "noopener");
+    // Monta a URL absoluta da imagem escolhida (refImg já vem com o basePath).
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const imgUrl = form.refImg
+      ? form.refImg.startsWith("http")
+        ? form.refImg
+        : origin + form.refImg
+      : "";
+    window.open(`https://wa.me/${ARTIST.whatsapp}?text=${encodeURIComponent(buildMessage(form, imgUrl))}`, "_blank", "noopener");
     setSubmitted(true);
   };
 
@@ -133,7 +151,8 @@ export default function QuoteForm() {
             </div>
 
             <p className="text-ink-muted text-sm leading-relaxed">
-              Preencha os dados e clique em enviar. O WhatsApp abre com a mensagem já formatada.
+              Escolha uma tatuagem no portfólio ou nos flashes, preencha os dados e clique em enviar.
+              O WhatsApp abre com a mensagem formatada — e a <strong className="text-ink">foto escolhida vai junto</strong>.
             </p>
 
             <div className="space-y-3">
@@ -186,12 +205,28 @@ export default function QuoteForm() {
               </motion.div>
             ) : (
               <form onSubmit={onSubmit} className="space-y-8">
-                {form.selectedFlash && (
-                  <div className="py-2.5 px-4 bg-paper-200 border border-paper-300 flex items-center gap-3">
-                    <div className="w-px h-4 bg-ink-muted flex-shrink-0" />
-                    <p className="text-xs text-ink-muted">
-                      Flash do Simulador: <strong className="text-ink">{form.selectedFlash}</strong>
-                    </p>
+                {form.refLabel && (
+                  <div className="flex items-center gap-4 p-3 bg-paper-200 border border-paper-300">
+                    {form.refImg && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={form.refImg}
+                        alt={form.refLabel}
+                        className="w-16 h-16 flex-shrink-0 object-cover border border-paper-300 bg-white"
+                      />
+                    )}
+                    <div className="flex-1">
+                      <p className="text-[9px] tracking-widest uppercase text-gold mb-0.5">Tatuagem escolhida</p>
+                      <p className="text-sm font-medium text-ink">{form.refLabel}</p>
+                      <p className="text-[10px] text-ink-faint mt-0.5">A foto vai junto na mensagem ✓</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setForm(p => ({ ...p, refLabel: "", refImg: "" }))}
+                      className="text-[9px] tracking-widest uppercase text-ink-faint hover:text-ink transition-colors"
+                    >
+                      Remover
+                    </button>
                   </div>
                 )}
 
@@ -227,14 +262,19 @@ export default function QuoteForm() {
                   </div>
                 </div>
 
-                {/* References */}
+                {/* References (próprias do cliente) */}
                 <div className="space-y-2">
-                  <label className="text-[9px] tracking-widest uppercase text-ink-muted">Referências visuais <span className="normal-case tracking-normal">(opcional)</span></label>
+                  <label className="text-[9px] tracking-widest uppercase text-ink-muted">Sua própria referência <span className="normal-case tracking-normal">(opcional)</span></label>
                   <button type="button" onClick={() => fileRef.current?.click()}
                     className="w-full flex items-center gap-2 py-3.5 border border-dashed border-paper-400 text-ink-faint hover:border-ink hover:text-ink transition-all duration-300 text-[9px] tracking-widest uppercase px-4">
                     <Upload size={12} />
-                    {form.references.length > 0 ? `${form.references.length} arquivo(s)` : "Selecionar imagens"}
+                    {form.references.length > 0 ? `${form.references.length} arquivo(s) selecionado(s)` : "Selecionar imagens"}
                   </button>
+                  {form.references.length > 0 && (
+                    <p className="text-[10px] text-ink-faint leading-snug">
+                      Suas imagens próprias você anexa direto no WhatsApp ao abrir a conversa (o link não carrega arquivos do seu aparelho).
+                    </p>
+                  )}
                   <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => {
                     if (e.target.files) setForm(p => ({ ...p, references: Array.from(e.target.files!) }));
                   }} />
